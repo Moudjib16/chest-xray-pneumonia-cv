@@ -1,0 +1,24 @@
+common:
+  data_dir: data/raw
+  splits_csv: data/splits.csv
+  img_size: 224
+  seed: 42
+  val_fraction: 0.15
+  lr_head: 3.0e-4
+  lr_backbone: 1.0e-4
+  weight_decay: 1.0e-4
+
+cpu:
+  batch_size: 32
+  num_workers: 2
+  pin_memory: false
+  amp: false
+  cpu_threads: 6
+  epochs: 8
+
+gpu:
+  batch_size: 64
+  num_workers: 4
+  pin_memory: true
+  amp: true
+  epochs: 20

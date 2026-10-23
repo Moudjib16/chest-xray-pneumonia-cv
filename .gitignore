@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.py[cod]
+data/
+models/
+*.pth
+runs/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+.DS_Store
+.env
+kaggle.json
