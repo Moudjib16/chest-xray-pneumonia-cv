@@ -7,6 +7,7 @@ The ``test`` split is copied through untouched.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pandas as pd
@@ -22,6 +23,14 @@ CLASSES = ("NORMAL", "PNEUMONIA")
 def load_config() -> dict:
     with (ROOT / "configs" / "config.yaml").open("r", encoding="utf-8") as fh:
         return yaml.safe_load(fh)["common"]
+
+
+def file_hash(path: Path, chunk_size: int = 1 << 20) -> str:
+    digest = hashlib.md5()
+    with path.open("rb") as fh:
+        for chunk in iter(lambda: fh.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def collect_images(split_dir: Path, split_names: tuple[str, ...]) -> list[dict]:
@@ -52,9 +61,22 @@ def main() -> None:
     pooled = collect_images(data_dir, ("train", "val"))
     if not pooled:
         raise SystemExit(f"No images found under {data_dir / 'train'} or {data_dir / 'val'}")
+    test_rows = collect_images(data_dir, ("test",))
 
-    paths = [row["path"] for row in pooled]
-    labels = [row["label"] for row in pooled]
+    for row in pooled + test_rows:
+        row["md5"] = file_hash(ROOT / row["path"])
+
+    pool = pd.DataFrame(pooled).drop_duplicates("md5", keep="first")
+    test = pd.DataFrame(test_rows).drop_duplicates("md5", keep="first")
+    duplicate_pool = len(pooled) - len(pool)
+    duplicate_test = len(test_rows) - len(test)
+
+    test_hashes = set(test["md5"])
+    leaked = int(pool["md5"].isin(test_hashes).sum())
+    pool = pool[~pool["md5"].isin(test_hashes)]
+
+    paths = pool["path"].tolist()
+    labels = pool["label"].tolist()
 
     train_paths, val_paths, train_labels, val_labels = train_test_split(
         paths,
@@ -73,7 +95,7 @@ def main() -> None:
         for path, label in zip(val_paths, val_labels)
     ]
 
-    for row in collect_images(data_dir, ("test",)):
+    for _, row in test.iterrows():
         rows.append({"path": row["path"], "label": row["label"], "split": "test"})
 
     frame = pd.DataFrame(rows, columns=["path", "label", "split"])
@@ -83,6 +105,8 @@ def main() -> None:
 
     summary = frame.groupby(["split", "label"]).size().unstack(fill_value=0)
     summary["total"] = summary.sum(axis=1)
+    print(f"Dropped {duplicate_pool} duplicate train/val images and {duplicate_test} duplicate test images")
+    print(f"Dropped {leaked} train/val images that duplicate a test image")
     print(f"Wrote {splits_csv.relative_to(ROOT)} ({len(frame)} rows)")
     print(summary.to_string())
 
