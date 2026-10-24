@@ -2,6 +2,7 @@
 torchvision==0.29.1
 numpy==2.5.4
 pandas==3.0.6
+scikit-learn==1.9.1
 matplotlib==3.11.2
 opencv-python==5.0.0.93
 albumentations==2.0.8
