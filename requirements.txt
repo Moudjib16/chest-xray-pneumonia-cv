@@ -9,3 +9,4 @@ albumentations==2.0.8
 streamlit==1.66.1
 PyYAML==6.0.3
 pytest==9.1.1
+jupyter==1.1.1
