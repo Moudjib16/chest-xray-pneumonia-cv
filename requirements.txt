@@ -1,0 +1,9 @@
+﻿torch==2.14.1
+torchvision==0.29.1
+numpy==2.5.4
+pandas==3.0.6
+matplotlib==3.11.2
+opencv-python==5.0.0.93
+albumentations==2.0.8
+streamlit==1.66.1
+PyYAML==6.0.3
