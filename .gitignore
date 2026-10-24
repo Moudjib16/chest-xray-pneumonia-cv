@@ -5,6 +5,7 @@ data/
 models/
 *.pth
 runs/
+reports/figures/*.png
 .ipynb_checkpoints/
 .pytest_cache/
 .ruff_cache/
