@@ -19,7 +19,12 @@ ResNet18, Grad-CAM explanations, and a Streamlit demo.
 
 ## Results
 
-Metrics for the current checkpoint at a 0.5 decision threshold
+> These numbers come from the **previous checkpoint, trained before the
+> leak-free split was introduced**; they are kept only to document the problem.
+> The model is being retrained on the new splits and this section will be
+> refreshed.
+
+Metrics at a 0.5 decision threshold
 (`python scripts/evaluate.py --split val|test`):
 
 | Split | Accuracy | Precision | Recall | F1 | ROC-AUC |
@@ -42,14 +47,22 @@ augmentation, and threshold calibration are the next improvements.
 from Kaggle. Place the extracted `train`, `val`, and `test` folders under
 `data/raw/`.
 
-`scripts/make_splits.py` hashes every image, removes duplicates, drops any
-train/val image that also appears in the test set, merges the tiny original
-validation folder into train, and performs a seeded stratified re-split:
+`scripts/make_splits.py` merges the tiny original validation folder into the
+training pool, then builds a **leak-free** split:
+
+* exact duplicates are removed by MD5;
+* images are grouped by patient/study identifier parsed from the filename;
+* near-duplicates are grouped with a 255-bit difference hash, so resized or
+  recompressed copies never cross splits;
+* any pooled image sharing a patient with the official test folder is dropped.
+
+The result is a seeded, class-stratified group split with zero patient overlap
+between splits:
 
 | Split | Images | NORMAL | PNEUMONIA |
 |-------|--------|--------|-----------|
-| train | 4,425  | 1,146  | 3,279     |
-| val   | 781    | 202    | 579       |
+| train | 4,074  | 1,156  | 2,918     |
+| val   | 679    | 192    | 487       |
 | test  | 618    | 231    | 387       |
 
 ## Project structure
