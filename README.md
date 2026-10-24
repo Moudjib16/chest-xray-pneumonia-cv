@@ -19,27 +19,21 @@ ResNet18, Grad-CAM explanations, and a Streamlit demo.
 
 ## Results
 
-> These numbers come from the **previous checkpoint, trained before the
-> leak-free split was introduced**; they are kept only to document the problem.
-> The model is being retrained on the new splits and this section will be
-> refreshed.
-
 Metrics at a 0.5 decision threshold
 (`python scripts/evaluate.py --split val|test`):
 
 | Split | Accuracy | Precision | Recall | F1 | ROC-AUC |
 |-------|----------|-----------|--------|----|---------|
-| val   | 0.9936   | 0.9914    | 1.0000 | 0.9957 | 0.9999 |
-| test  | 0.7346   | 0.7024    | 1.0000 | 0.8252 | 0.9240 |
+| val   | 0.9823   | 0.9979    | 0.9774 | 0.9876 | 0.9989 |
+| test  | 0.9223   | 0.8970    | 0.9897 | 0.9410 | 0.9684 |
 
-**Read these numbers carefully.** The validation split is inflated: it is
-de-duplicated by exact MD5 only, and many validation images share a patient or
-study with the training set. On the official Kaggle test folder the model
-predicts pneumonia for almost every image (164 of 231 normals misclassified,
-no pneumonia missed), so accuracy drops even though ROC-AUC stays at 0.924.
-That gap points to distribution shift and poor probability calibration rather
-than a complete loss of signal. A patient-level/perceptual-hash split, stronger
-augmentation, and threshold calibration are the next improvements.
+Validation is now an honest estimate: the split is patient- and
+near-duplicate-aware, so it cannot share a patient with training. The test
+column is the official Kaggle test folder, which is a harder, shifted external
+set — the model keeps high sensitivity (98.97%, only 4 missed pneumonias) with
+89.70% precision there. Earlier checkpoints trained on a leaky split scored
+99.4% on validation but only 73.5% on test; fixing the split and adding
+stronger augmentation closed most of that gap.
 
 ## Dataset
 
