@@ -10,6 +10,7 @@ common:
   use_class_weights: true
   label_smoothing: 0.05
   early_stopping_patience: 3
+  decision_threshold: 0.5
 
 cpu:
   batch_size: 32

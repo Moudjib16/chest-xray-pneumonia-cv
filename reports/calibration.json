@@ -1,0 +1,33 @@
+{
+  "split": "val",
+  "n_samples": 679,
+  "target_sensitivity": 0.98,
+  "default_threshold": 0.5,
+  "threshold_youden": 0.38193514943122864,
+  "threshold_best_accuracy": 0.22999999999999998,
+  "threshold_target_sensitivity": 0.4599999999999999,
+  "metrics_default": {
+    "threshold": 0.5,
+    "sensitivity": 0.9774127310061602,
+    "specificity": 0.9947916666666666,
+    "accuracy": 0.9823269513991163
+  },
+  "metrics_youden": {
+    "threshold": 0.38193514943122864,
+    "sensitivity": 0.9835728952772074,
+    "specificity": 0.9947916666666666,
+    "accuracy": 0.9867452135493373
+  },
+  "metrics_best_accuracy": {
+    "threshold": 0.22999999999999998,
+    "sensitivity": 0.9897330595482546,
+    "specificity": 0.9791666666666666,
+    "accuracy": 0.9867452135493373
+  },
+  "metrics_target_sensitivity": {
+    "threshold": 0.4599999999999999,
+    "sensitivity": 0.9815195071868583,
+    "specificity": 0.9947916666666666,
+    "accuracy": 0.9852724594992637
+  }
+}

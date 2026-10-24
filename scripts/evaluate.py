@@ -42,11 +42,16 @@ def collect_predictions(model, loader, device: torch.device):
     return np.concatenate(probabilities), np.concatenate(labels)
 
 
-def compute_metrics(probabilities: np.ndarray, labels: np.ndarray) -> dict:
-    predictions = probabilities.argmax(axis=1)
+def compute_metrics(
+    probabilities: np.ndarray,
+    labels: np.ndarray,
+    threshold: float = 0.5,
+) -> dict:
+    predictions = (probabilities[:, 1] >= threshold).astype(int)
     pneumonia_scores = probabilities[:, 1]
 
     return {
+        "threshold": float(threshold),
         "n_samples": int(labels.size),
         "accuracy": float(accuracy_score(labels, predictions)),
         "precision": float(
@@ -100,6 +105,12 @@ def main() -> None:
     parser.add_argument("--profile", default="cpu", choices=["cpu", "gpu"])
     parser.add_argument("--split", default="test", choices=["train", "val", "test"])
     parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.5,
+        help="pneumonia probability above which the sample is positive",
+    )
+    parser.add_argument(
         "--checkpoint",
         type=Path,
         default=ROOT / "models" / "resnet18_xray.pth",
@@ -133,10 +144,16 @@ def main() -> None:
     model.load_state_dict(torch.load(args.checkpoint, map_location=device))
     model.to(device)
 
-    probabilities, labels = collect_predictions(model, loader, device)
-    metrics = compute_metrics(probabilities, labels)
+    if not 0.0 <= args.threshold <= 1.0:
+        raise ValueError("threshold must be between 0 and 1")
 
-    print(f"split: {args.split} | samples: {metrics['n_samples']} | device: {device}")
+    probabilities, labels = collect_predictions(model, loader, device)
+    metrics = compute_metrics(probabilities, labels, threshold=args.threshold)
+
+    print(
+        f"split: {args.split} | samples: {metrics['n_samples']} | "
+        f"threshold: {metrics['threshold']:.3f} | device: {device}"
+    )
     print(f"accuracy:  {metrics['accuracy']:.4f}")
     print(f"precision: {metrics['precision']:.4f}")
     print(f"recall:    {metrics['recall']:.4f}")
