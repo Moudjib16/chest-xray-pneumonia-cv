@@ -118,6 +118,13 @@ the gradients of the target class over the feature map, weights the activations,
 applies ReLU, and upsamples the result to the input resolution. The Streamlit
 app overlays the heatmap (JET colormap) on the uploaded X-ray.
 
+![Grad-CAM examples on the test split](docs/gradcam_examples.png)
+
+Regenerate the figure with `python scripts/gradcam_gallery.py --split test`.
+Attention concentrates on the cardiomediastinal silhouette and lower lung
+fields rather than image borders or text markers, which is the expected
+behaviour for this classifier.
+
 ## Disclaimer
 
 This project is for research and portfolio demonstration only. It is not a
