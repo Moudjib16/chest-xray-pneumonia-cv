@@ -5,53 +5,126 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.66-FF4B4B?logo=streamlit&logoColor=white)
 ![OpenCV](https://img.shields.io/badge/OpenCV-5.0-5C3EE8?logo=opencv&logoColor=white)
 
-End-to-end chest X-ray classification (NORMAL vs PNEUMONIA) with a fine-tuned
-ResNet18, Grad-CAM explanations, and a Streamlit demo.
+End-to-end chest X-ray pneumonia classification with a fine-tuned ResNet18,
+Grad-CAM explanations, and a Streamlit demo.
 
-## Overview
+![Grad-CAM examples](docs/gradcam_examples.png)
 
-* Transfer learning from ImageNet-pretrained ResNet18 to a 2-class classifier.
-* Albumentations augmentation pipeline (resize, horizontal flip, rotation,
-  ImageNet normalisation).
-* Class-weighted cross-entropy to counter the pneumonia-heavy dataset.
-* Grad-CAM heatmaps to show which regions drive each prediction.
-* Streamlit app for upload-and-explain inference.
+*Correct normal, correct pneumonia, a false positive, and a false negative on
+the held-out test split. The heatmaps concentrate on the lung fields and
+cardiomediastinal silhouette rather than image borders or text markers.*
+
+---
+
+## What is pneumonia?
+
+Pneumonia is an infection that inflames the air sacs (alveoli) in one or both
+lungs. The sacs may fill with fluid or pus, which is what causes the cough,
+fever, chest pain, and difficulty breathing. It is usually caused by:
+
+* **bacteria** (for example *Streptococcus pneumoniae*) — often the most severe;
+* **viruses** (for example RSV or influenza) — very common in young children;
+* **fungi** — rare, mostly in people with weakened immune systems.
+
+On a chest X-ray, pneumonia typically appears as an area of increased density —
+consolidation, infiltrates, or opacities — where the air-filled lung should look
+dark. Radiologists diagnose it by looking for those regional patterns.
+
+Reading chest X-rays is repetitive, and early findings can be subtle and are
+subject to observer variability. A model that flags suspicious films and
+explains *where* it is looking can help prioritise review. It does **not**
+replace a clinician — this repository is an educational project, not a medical
+device.
+
+## The problem
+
+Building this classifier surfaced four concrete difficulties:
+
+1. **Class imbalance.** About 70% of images are pneumonia, so plain accuracy is
+   misleading and a model can score well by biasing toward the majority class.
+2. **Subtle, diffuse findings.** Bacterial and viral pneumonia do not appear as a
+   single tidy object; they are spread across a lung field, which makes the task
+   harder than a typical object-recognition problem.
+3. **Silent data leakage.** A naive random split put the *same patients* and
+   near-duplicate images in both train and validation. The first model reached
+   **99.4% validation accuracy but only 73.5% on the official test set** —
+   validation was measuring memorisation, not generalisation.
+4. **Trust / black-box behaviour.** A number alone is not useful to a clinician;
+   the model needs to show the evidence behind a prediction.
+
+## The approach
+
+```mermaid
+flowchart LR
+    A[Raw chest X-rays] --> B[Leak-free split:<br/>patient + dHash grouping]
+    B --> C[Augmented DataLoaders]
+    C --> D[ResNet18 transfer learning]
+    D --> E[Early stopping on val loss]
+    E --> F[Threshold calibration]
+    D --> G[Grad-CAM]
+    F --> H[Streamlit app]
+    G --> H
+```
+
+* **Leak-free data split** — images are grouped by patient/study identifier and
+  by a 255-bit perceptual hash, so near-duplicates never cross splits; any image
+  sharing a patient with the test folder is dropped from training.
+* **Augmentation** — random resized crop, horizontal flip, small rotation, and
+  brightness/contrast jitter, normalised with ImageNet statistics.
+* **Transfer learning** — ImageNet-pretrained ResNet18 with the classifier head
+  replaced for two classes, trained with class-weighted, label-smoothed
+  cross-entropy, AdamW, a cosine LR schedule, and early stopping.
+* **Honest evaluation** — accuracy, precision, recall/sensitivity, F1, ROC-AUC,
+  and a confusion matrix, plus a threshold calibration script.
+* **Explainability** — Grad-CAM on the last convolutional block, with an
+  attention gallery for qualitative checking.
+* **Demo** — a Streamlit app that takes an uploaded X-ray, predicts, and shows
+  the Grad-CAM overlay.
 
 ## Results
 
-Metrics at a 0.5 decision threshold
+Metrics at the default 0.5 decision threshold
 (`python scripts/evaluate.py --split val|test`):
 
-| Split | Accuracy | Precision | Recall | F1 | ROC-AUC |
-|-------|----------|-----------|--------|----|---------|
-| val   | 0.9823   | 0.9979    | 0.9774 | 0.9876 | 0.9989 |
-| test  | 0.9223   | 0.8970    | 0.9897 | 0.9410 | 0.9684 |
+| Split | Accuracy | Precision | Recall (sensitivity) | F1 | ROC-AUC |
+|-------|----------|-----------|----------------------|----|---------|
+| val   | 0.9823   | 0.9979    | 0.9774               | 0.9876 | 0.9989 |
+| test  | 0.9223   | 0.8970    | 0.9897               | 0.9410 | 0.9684 |
 
-Validation is now an honest estimate: the split is patient- and
-near-duplicate-aware, so it cannot share a patient with training. The test
-column is the official Kaggle test folder, which is a harder, shifted external
-set — the model keeps high sensitivity (98.97%, only 4 missed pneumonias) with
-89.70% precision there. Earlier checkpoints trained on a leaky split scored
-99.4% on validation but only 73.5% on test; fixing the split and adding
-stronger augmentation closed most of that gap.
+![Evaluation: ROC curves and confusion matrices](docs/evaluation.png)
+
+On the test split the model misses only **4 of 387** pneumonia cases (98.97%
+recall) with 89.70% precision. Validation is a genuinely leak-free estimate, and
+the test column is the harder, shifted official Kaggle test folder.
+
+> **Framing note.** The validation number should not be read as real-world
+> performance. The Kaggle folders carry an acquisition bias (normal images are
+> larger/higher-resolution than pneumonia images), so in-distribution validation
+> is optimistic. Because that bias is much weaker on the official test set, the
+> test metrics are the more trustworthy headline.
 
 ## Dataset
 
 [Chest X-Ray Images (Pneumonia)](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia)
-from Kaggle. Place the extracted `train`, `val`, and `test` folders under
-`data/raw/`.
+(Kermany et al.). Anterior-posterior chest X-rays of pediatric patients (one to
+five years old) collected at the Guangzhou Women and Children's Medical Center.
 
-`scripts/make_splits.py` merges the tiny original validation folder into the
-training pool, then builds a **leak-free** split:
+![Dataset samples](docs/dataset_samples.png)
 
-* exact duplicates are removed by MD5;
-* images are grouped by patient/study identifier parsed from the filename;
-* near-duplicates are grouped with a 255-bit difference hash, so resized or
-  recompressed copies never cross splits;
-* any pooled image sharing a patient with the official test folder is dropped.
+![Class distribution](docs/class_distribution.png)
 
-The result is a seeded, class-stratified group split with zero patient overlap
-between splits:
+![Image dimensions by class](docs/image_dimensions.png)
+
+`scripts/make_splits.py` merges the original tiny `val` folder into the training
+pool and rebuilds a **leak-free** split:
+
+* exact duplicates removed by MD5;
+* images grouped by patient/study identifier parsed from the filename;
+* near-duplicates grouped with a 255-bit difference hash;
+* pooled images sharing a patient with the test folder are dropped.
+
+The result is a seeded, class-stratified group split with **zero patient
+overlap** between splits:
 
 | Split | Images | NORMAL | PNEUMONIA |
 |-------|--------|--------|-----------|
@@ -59,43 +132,48 @@ between splits:
 | val   | 679    | 192    | 487       |
 | test  | 618    | 231    | 387       |
 
-## Project structure
+The raw images are not redistributed in this repository (`data/` is git-ignored);
+download them from Kaggle and place them under `data/raw/`.
 
-```
-app/main.py             Streamlit upload-and-explain demo
-configs/config.yaml     paths, hyperparameters, CPU/GPU profiles
-notebooks/01_eda.ipynb  exploratory data analysis
-scripts/make_splits.py  de-duplicate images and build data/splits.csv
-scripts/sanity_check.py validate paths, overlaps, and batch loading
-scripts/evaluate.py     test metrics and confusion matrix
-src/dataset.py          Dataset, transforms, DataLoaders
-src/model.py            ResNet18 builder and Grad-CAM target layer
-src/train.py            CPU/GPU training loop with best-checkpoint saving
-src/gradcam.py          Grad-CAM heatmap generation and overlay helpers
-tests/                  dataset, model, and Grad-CAM tests
-```
-
-## Setup
+## Installation
 
 ```bash
+git clone https://github.com/Moudjib16/chest-xray-pneumonia-cv.git
+cd chest-xray-pneumonia-cv
+
 python -m venv venv
-venv\Scripts\activate
+venv\Scripts\activate            # Windows
+# source venv/bin/activate       # macOS / Linux
+
 pip install -r requirements.txt
 ```
 
-Training uses a ResNet18 initialised with ImageNet weights, so the first run
-needs to download them (cached afterwards in the PyTorch hub cache).
+Download the dataset from Kaggle and lay it out as:
+
+```
+data/raw/
+├── train/
+│   ├── NORMAL/*.jpeg
+│   └── PNEUMONIA/*.jpeg
+├── val/
+└── test/
+    ├── NORMAL/*.jpeg
+    └── PNEUMONIA/*.jpeg
+```
+
+`scripts/make_splits.py` rebuilds `data/splits.csv` from this layout, so the
+original `train`/`val` folders are pooled automatically. Training initialises
+ResNet18 with ImageNet weights, which are downloaded on first use and cached
+afterwards.
 
 ## Usage
 
 ```bash
-# build de-duplicated, stratified splits
+# build the leak-free splits and verify the pipeline
 python scripts/make_splits.py
-
-# verify the pipeline
 python scripts/sanity_check.py
 
-# train (CPU profile by default; also --profile gpu, --epochs N)
+# train (CPU profile by default; --profile gpu and --epochs N also supported)
 python src/train.py --profile cpu
 
 # evaluate the best checkpoint
@@ -104,7 +182,7 @@ python scripts/evaluate.py --split test
 # pick a decision threshold on validation
 python scripts/calibrate.py --split val
 
-# render Grad-CAM examples
+# render the Grad-CAM gallery
 python scripts/gradcam_gallery.py --split test
 
 # tests
@@ -114,24 +192,52 @@ pytest -q
 streamlit run app/main.py
 ```
 
-Hyperparameters and split paths live in `configs/config.yaml`. The best
-checkpoint is saved to `models/resnet18_xray.pth`.
+Hyperparameters, split paths, and the decision threshold live in
+`configs/config.yaml`. The best checkpoint is written to
+`models/resnet18_xray.pth`.
 
-## Grad-CAM
+## Project structure
 
-`src/gradcam.py` hooks the last convolutional block (`model.layer4`), averages
-the gradients of the target class over the feature map, weights the activations,
-applies ReLU, and upsamples the result to the input resolution. The Streamlit
-app overlays the heatmap (JET colormap) on the uploaded X-ray.
+```
+app/main.py             Streamlit upload-and-explain demo
+configs/config.yaml     paths, hyperparameters, CPU/GPU profiles
+docs/                   README figures
+notebooks/01_eda.ipynb  exploratory data analysis
+scripts/make_splits.py  leak-free split: patient + dHash grouping
+scripts/sanity_check.py validate paths, overlaps, and batch loading
+scripts/evaluate.py     metrics + confusion matrix
+scripts/calibrate.py    decision-threshold selection
+scripts/gradcam_gallery.py  Grad-CAM attention gallery
+src/dataset.py          Dataset, transforms, DataLoaders
+src/model.py            ResNet18 builder and Grad-CAM target layer
+src/train.py            training loop with early stopping
+src/gradcam.py          Grad-CAM heatmaps and overlays
+tests/                  dataset, model, and Grad-CAM tests
+```
 
-![Grad-CAM examples on the test split](docs/gradcam_examples.png)
+## Limitations
 
-Regenerate the figure with `python scripts/gradcam_gallery.py --split test`.
-Attention concentrates on the cardiomediastinal silhouette and lower lung
-fields rather than image borders or text markers, which is the expected
-behaviour for this classifier.
+* Trained and evaluated on a single pediatric dataset from one institution; it
+  has **not** been validated on external data (for example NIH ChestX-ray14 or
+  CheXpert).
+* The dataset has a documented acquisition bias (image resolution and file size
+  differ between classes), which inflates in-distribution validation.
+* Results come from a single training run; no cross-validation spread is
+  reported.
+* Predicted probabilities are not perfectly calibrated; adjust the decision
+  threshold for the sensitivity/specificity trade-off you need.
+* Grad-CAM is indicative, not a causal explanation of the decision.
 
 ## Disclaimer
 
-This project is for research and portfolio demonstration only. It is not a
-medical device and must not be used for clinical decisions.
+This is a research and portfolio project. It is **not** a medical device and
+must not be used for clinical diagnosis or treatment decisions. Always consult a
+qualified healthcare professional.
+
+## Acknowledgements
+
+* Dataset: [Chest X-Ray Images (Pneumonia)](https://www.kaggle.com/datasets/paultimothymooney/chest-xray-pneumonia)
+  (Kermany et al., 2018), used here under its Kaggle terms.
+* Model: ImageNet-pretrained ResNet18 from `torchvision`.
+* Grad-CAM: Selvaraju et al., *Grad-CAM: Visual Explanations from Deep Networks
+  via Gradient-based Localization* (2017).
