@@ -95,26 +95,28 @@ def main() -> None:
         st.stop()
 
     tensor = transform(image=image)["image"].unsqueeze(0)
+    threshold = float(config["common"].get("decision_threshold", 0.5))
 
     with st.spinner("Running the model..."):
         with torch.no_grad():
             probabilities = torch.softmax(model(tensor), dim=1)[0].numpy()
-        predicted_index = int(probabilities.argmax())
+        predicted_index = int(probabilities[1] >= threshold)
         heatmaps, _ = gradcam.generate(tensor, target_class=predicted_index)
 
     overlay = overlay_heatmap(image, heatmaps[0])
-    label = CLASSES[predicted_index]
-    confidence = float(probabilities[predicted_index])
+    pneumonia_score = float(probabilities[1])
 
-    if label == "PNEUMONIA":
+    if predicted_index == 1:
         st.error(
-            f"Confidence {confidence:.1%}",
+            f"Pneumonia probability {pneumonia_score:.1%} "
+            f"(threshold {threshold:.0%})",
             title="Pneumonia detected",
             icon=":material/warning:",
         )
     else:
         st.success(
-            f"Confidence {confidence:.1%}",
+            f"Pneumonia probability {pneumonia_score:.1%} "
+            f"(threshold {threshold:.0%})",
             title="No pneumonia detected",
             icon=":material/check_circle:",
         )
@@ -122,6 +124,10 @@ def main() -> None:
     normal_col, pneumonia_col = st.columns(2)
     normal_col.metric("Normal", f"{probabilities[0]:.1%}", border=True)
     pneumonia_col.metric("Pneumonia", f"{probabilities[1]:.1%}", border=True)
+    st.caption(
+        f"Pneumonia is flagged when the score is at or above {threshold:.0%}. "
+        "Change the decision threshold in `configs/config.yaml`."
+    )
 
     original_col, heatmap_col = st.columns(2)
     original_col.image(
