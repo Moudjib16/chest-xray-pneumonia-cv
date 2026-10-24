@@ -8,3 +8,4 @@ opencv-python==5.0.0.93
 albumentations==2.0.8
 streamlit==1.66.1
 PyYAML==6.0.3
+pytest==9.1.1
