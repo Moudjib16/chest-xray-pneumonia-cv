@@ -7,6 +7,7 @@ common:
   lr_head: 3.0e-4
   lr_backbone: 1.0e-4
   weight_decay: 1.0e-4
+  use_class_weights: true
 
 cpu:
   batch_size: 32
