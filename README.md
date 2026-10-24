@@ -19,14 +19,22 @@ ResNet18, Grad-CAM explanations, and a Streamlit demo.
 
 ## Results
 
-Run the evaluation script to reproduce metrics on the held-out test split:
+Metrics for the current checkpoint at a 0.5 decision threshold
+(`python scripts/evaluate.py --split val|test`):
 
-```bash
-python scripts/evaluate.py --split test --figure reports/figures/confusion_matrix.png
-```
+| Split | Accuracy | Precision | Recall | F1 | ROC-AUC |
+|-------|----------|-----------|--------|----|---------|
+| val   | 0.9936   | 0.9914    | 1.0000 | 0.9957 | 0.9999 |
+| test  | 0.7346   | 0.7024    | 1.0000 | 0.8252 | 0.9240 |
 
-The report is written to `reports/test_metrics.json` (accuracy, precision,
-recall, F1, ROC-AUC, confusion matrix).
+**Read these numbers carefully.** The validation split is inflated: it is
+de-duplicated by exact MD5 only, and many validation images share a patient or
+study with the training set. On the official Kaggle test folder the model
+predicts pneumonia for almost every image (164 of 231 normals misclassified,
+no pneumonia missed), so accuracy drops even though ROC-AUC stays at 0.924.
+That gap points to distribution shift and poor probability calibration rather
+than a complete loss of signal. A patient-level/perceptual-hash split, stronger
+augmentation, and threshold calibration are the next improvements.
 
 ## Dataset
 
