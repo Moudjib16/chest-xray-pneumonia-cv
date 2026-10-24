@@ -101,6 +101,12 @@ python src/train.py --profile cpu
 # evaluate the best checkpoint
 python scripts/evaluate.py --split test
 
+# pick a decision threshold on validation
+python scripts/calibrate.py --split val
+
+# render Grad-CAM examples
+python scripts/gradcam_gallery.py --split test
+
 # tests
 pytest -q
 
