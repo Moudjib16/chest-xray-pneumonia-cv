@@ -10,7 +10,7 @@ common:
 
 cpu:
   batch_size: 32
-  num_workers: 2
+  num_workers: 4
   pin_memory: false
   amp: false
   cpu_threads: 6
