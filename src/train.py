@@ -101,7 +101,9 @@ def main() -> None:
     else:
         weights = None
 
-    criterion = nn.CrossEntropyLoss(weight=weights)
+    criterion = nn.CrossEntropyLoss(
+        weight=weights, label_smoothing=float(common.get("label_smoothing", 0.0))
+    )
     optimizer = torch.optim.AdamW(
         [
             {
@@ -112,26 +114,42 @@ def main() -> None:
         ],
         weight_decay=common["weight_decay"],
     )
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+    patience = int(common.get("early_stopping_patience", 0))
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     best_val_acc = 0.0
+    best_val_loss = float("inf")
+    epochs_without_improvement = 0
 
     for epoch in range(1, epochs + 1):
         start = time.perf_counter()
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer)
         val_loss, val_acc = evaluate(model, val_loader, criterion)
+        scheduler.step()
         elapsed = time.perf_counter() - start
 
         print(
             f"epoch {epoch}/{epochs} | "
             f"train loss {train_loss:.4f} acc {train_acc:.4f} | "
-            f"val loss {val_loss:.4f} acc {val_acc:.4f} | {elapsed:.1f}s"
+            f"val loss {val_loss:.4f} acc {val_acc:.4f} | "
+            f"lr {optimizer.param_groups[0]['lr']:.2e} | {elapsed:.1f}s"
         )
 
         if val_acc > best_val_acc:
             best_val_acc = val_acc
             torch.save(model.state_dict(), args.output)
             print(f"  saved best weights (val_acc={val_acc:.4f}) -> {args.output}")
+
+        if val_loss < best_val_loss - 1e-4:
+            best_val_loss = val_loss
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
+            print(f"  no val loss improvement for {epochs_without_improvement} epoch(s)")
+            if patience and epochs_without_improvement >= patience:
+                print(f"early stopping at epoch {epoch} (patience={patience})")
+                break
 
     print(f"training complete: best val acc = {best_val_acc:.4f}")
 

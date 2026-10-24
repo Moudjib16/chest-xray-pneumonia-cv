@@ -29,9 +29,15 @@ def build_transforms(img_size: int, train: bool) -> A.Compose:
     if train:
         return A.Compose(
             [
-                A.Resize(img_size, img_size),
+                A.RandomResizedCrop(
+                    size=(img_size, img_size),
+                    scale=(0.85, 1.0),
+                    ratio=(0.9, 1.1),
+                    p=1.0,
+                ),
                 A.HorizontalFlip(p=0.5),
                 A.Rotate(limit=10, p=0.5),
+                A.RandomBrightnessContrast(p=0.3),
                 A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
                 ToTensorV2(),
             ]

@@ -8,14 +8,16 @@ common:
   lr_backbone: 1.0e-4
   weight_decay: 1.0e-4
   use_class_weights: true
+  label_smoothing: 0.05
+  early_stopping_patience: 3
 
 cpu:
   batch_size: 32
-  num_workers: 4
+  num_workers: 2
   pin_memory: false
   amp: false
-  cpu_threads: 6
-  epochs: 8
+  cpu_threads: 10
+  epochs: 10
 
 gpu:
   batch_size: 64
